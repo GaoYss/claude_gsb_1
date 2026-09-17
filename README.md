@@ -12,10 +12,11 @@
 | 模块 | 页面 | 主要能力 |
 | --- | --- | --- |
 | 养护总览 | `/dashboard` | 绿地与养护总量指标、近半年记录与工时趋势、绿地类型/任务类型/更换原因分布、逾期任务提醒、养护工作量排名 |
-| 绿地台账 | `/green-spaces` | 绿地建档（编号自动生成）、按行政区/类型/等级/状态/关键字检索、档案详情（概览 + 近期任务/记录/更换 + 更换原因汇总）、删除保护 |
+| 绿地台账 | `/green-spaces` | 绿地建档（编号自动生成）、按行政区/类型/等级/状态/关键字检索、档案详情（概览 + 近期任务/记录/更换 + 树木档案 + 更换原因汇总）、删除保护 |
 | 养护任务 | `/tasks` | 任务登记（编号按日生成）、按状态/类型/优先级/绿地/计划日期区间/逾期筛选、状态流转（待执行→进行中→已完成/已取消）、任务详情与执行进度 |
 | 养护记录 | `/records` | 记录录入（可关联任务，也可登记日常巡查）、工时/天气/材料/质量评定、质量分布与工时汇总、记录详情 |
 | 绿植更换 | `/replacements` | 更换登记（植株、类别、规格、数量、原因、原植株状况、供苗单位、单价与金额）、按类别/原因统计与占比、按绿地/日期区间筛选 |
+| 树木档案 | `/trees` | 一树一档（树种、胸径、树高、树龄、保护级别、责任单位、经纬度点位）、复壮/支撑/防腐等措施逐次登记、按保护级别/行政区/绿地检索、档案与措施统计、删除保护 |
 
 ## 二、目录结构
 
@@ -33,12 +34,13 @@
 │   │   │   ├── maintenance_tasks.py
 │   │   │   ├── maintenance_records.py
 │   │   │   ├── plant_replacements.py
+│   │   │   ├── trees.py
 │   │   │   ├── statistics.py
 │   │   │   └── meta.py
 │   │   ├── schemas/             # 校验层：写库字段校验 + 查询条件解析
 │   │   │   ├── common.py        # 链式字段校验器
 │   │   │   ├── filters.py       # 列表过滤条件
-│   │   │   └── green_space.py / maintenance_task.py / maintenance_record.py / plant_replacement.py
+│   │   │   └── green_space.py / maintenance_task.py / maintenance_record.py / plant_replacement.py / tree.py / tree_maintenance.py
 │   │   ├── services/            # 业务层：事务、编号生成、跨模块规则
 │   │   │   ├── base_service.py  # 通用增删改与编号冲突重试
 │   │   │   ├── code_generator.py
@@ -46,6 +48,7 @@
 │   │   │   ├── maintenance_task_service.py
 │   │   │   ├── maintenance_record_service.py
 │   │   │   ├── plant_replacement_service.py
+│   │   │   ├── tree_service.py / tree_maintenance_service.py
 │   │   │   └── statistics_service.py
 │   │   ├── models/              # 模型层：SQLAlchemy 模型与序列化
 │   │   └── utils/               # 响应封装、分页、日期、排序等
@@ -64,7 +67,7 @@
 │   │   ├── stores/              # Pinia：字典缓存、布局状态
 │   │   ├── styles/              # 全局样式与主题变量
 │   │   ├── utils/               # 数值/面积/金额/日期格式化
-│   │   └── views/               # 视图：dashboard / green-space / task / record / replacement
+│   │   └── views/               # 视图：dashboard / green-space / task / record / replacement / tree
 │   ├── docker/nginx.conf        # 静态资源 + /api 反向代理
 │   ├── vite.config.js           # 开发代理 /api → 后端
 │   └── package.json
@@ -89,7 +92,7 @@ docker compose up -d --build
 - 后端接口：<http://localhost:5000/api/v1/meta/health>
 - PostgreSQL：`localhost:5432`（容器内 `db:5432`）
 
-首次启动会自动建表；`SEED_DEMO_DATA=true` 时会写入一批演示数据（7 处绿地、15 条任务、22 条养护记录、8 条更换记录）。停止与清理：
+首次启动会自动建表；`SEED_DEMO_DATA=true` 时会写入一批演示数据（7 处绿地、18 条任务、24 条养护记录、8 条更换记录、8 份树木档案、13 次树木养护措施）。停止与清理：
 
 ```bash
 docker compose down            # 停止容器，保留数据库卷
@@ -159,21 +162,26 @@ cd frontend && npm run build && npm run preview
 | GET/POST | `/plant-replacements` | 更换记录列表（`green_space_id`/`plant_category`/`reason`/日期区间，返回汇总） / 登记更换 |
 | GET/PUT/DELETE | `/plant-replacements/{id}` | 详情 / 更新 / 删除 |
 | GET | `/plant-replacements/summary` | 更换汇总（按植物类别、更换原因） |
+| GET/POST | `/trees` | 树木档案列表（`keyword`/`protection_level`/`growth_vigor`/`district`/`green_space_id`，返回汇总） / 树木建档（编号可留空自动生成） |
+| GET/PUT/DELETE | `/trees/{id}` | 档案详情（含措施统计与逐次措施记录） / 更新（编号不可改） / 删除（有措施时需 `force`） |
+| GET | `/trees/summary` | 树木汇总（总数、保护级别分布、覆盖行政区、措施次数） |
+| GET/POST | `/tree-maintenances` | 措施列表（`tree_id`/`measure_type`/日期区间） / 登记措施（复壮、支撑、防腐等） |
+| GET/PUT/DELETE | `/tree-maintenances/{id}` | 措施详情 / 更新 / 删除 |
 | GET | `/statistics/dashboard` | 看板聚合数据（总览 + 分布 + 趋势 + 榜单 + 提醒 + 最近动态） |
 | GET | `/statistics/overview` `/distributions` `/trends` `/ranking` `/reminders` | 看板分项接口 |
 
 ## 六、业务规则
 
-1. **业务编号**：绿地 `GS-年份-序号`（如 `GS-2026-0001`），任务 `MT-YYYYMMDD-序号`，养护记录 `MR-YYYYMMDD-序号`，更换记录 `PR-YYYYMMDD-序号`；留空自动生成，唯一约束冲突时自动重试，编号创建后不可修改。
+1. **业务编号**：绿地 `GS-年份-序号`（如 `GS-2026-0001`），任务 `MT-YYYYMMDD-序号`，养护记录 `MR-YYYYMMDD-序号`，更换记录 `PR-YYYYMMDD-序号`，树木档案 `TR-年份-序号`，树木养护措施 `TM-YYYYMMDD-序号`；留空自动生成，唯一约束冲突时自动重试，编号创建后不可修改。
 2. **任务状态联动**（`maintenance_record_service`）：
    - 任务下有养护记录后，任务自动从「待执行」进入「进行中」；
    - 存在**合格**记录且**没有不合格**记录时，任务自动置为「已完成」并写入完成时间；
    - 存在不合格记录时任务保持「进行中」，必须整改复检（把记录改判为合格或删除）后才会完成，手动「标记完成」同样会被拒绝；
    - 删除养护记录后按剩余记录重新推算任务状态，避免出现「已完成却没有记录」；已取消的任务不允许补录记录。
 3. **绿地归属一致性**：养护记录可只填绿地（日常养护）或只填任务（绿地自动跟随任务）；两者同时提供时必须属于同一绿地。更换记录若关联养护记录，必须是同一绿地的记录。
-4. **日期约束**：养护日期、更换日期不得早于绿地建成日期。
+4. **日期约束**：养护日期、更换日期不得早于绿地建成日期；树木养护措施的实施日期同样不得早于所在绿地建成日期。
 5. **金额核算**：更换金额 = 数量 × 单价，由后端统一计算；未填单价时金额留空，前端提示补录。
-6. **删除保护**：删除绿地时若已存在任务/记录/更换数据会返回 409 并给出数量明细，需 `force=true` 才级联删除；删除任务时养护记录默认保留（解除关联），避免养护履历丢失。
+6. **删除保护**：删除绿地时若已存在任务/记录/更换/树木档案数据会返回 409 并给出数量明细，需 `force=true` 才级联删除；删除任务时养护记录默认保留（解除关联），避免养护履历丢失；删除树木档案时若已登记养护措施需 `force=true`，措施记录随档案一并清除。
 7. **字典单一来源**：所有枚举在 `backend/app/constants.py` 定义，前端通过 `/meta/enums` 获取并缓存，前后端不重复维护。
 
 ## 七、数据模型
@@ -184,17 +192,19 @@ cd frontend && npm run build && npm run preview
 | `maintenance_task` | 养护任务 | `task_no`(唯一)、`green_space_id`、`task_type`、`plan_date`、`priority`、`executor`、`status`、`completed_at` |
 | `maintenance_record` | 养护记录 | `record_no`(唯一)、`task_id`(可空)、`green_space_id`、`record_date`、`work_content`、`worker`、`work_hours`、`weather`、`quality_result` |
 | `plant_replacement` | 绿植更换记录 | `replacement_no`(唯一)、`green_space_id`、`maintenance_record_id`(可空)、`plant_name`、`plant_category`、`quantity`、`unit`、`reason`、`unit_price`、`amount` |
+| `tree` | 树木档案 | `code`(唯一)、`green_space_id`、`species`、`dbh_cm`、`height_m`、`age_years`、`protection_level`、`growth_vigor`、`responsible_unit`、`longitude`、`latitude`、`location_desc` |
+| `tree_maintenance` | 树木养护措施 | `record_no`(唯一)、`tree_id`、`measure_type`、`measure_date`、`content`、`operator` |
 
-绿地删除时任务/记录/更换级联清理；任务与养护记录之间、养护记录与更换记录之间为可空外键（`SET NULL`），保证养护履历可独立留存。
+绿地删除时任务/记录/更换/树木档案级联清理；任务与养护记录之间、养护记录与更换记录之间为可空外键（`SET NULL`），保证养护履历可独立留存；树木养护措施随树木档案级联清理。
 
 ## 八、测试
 
 ```bash
 cd backend
-python -m pytest              # 52 个用例：接口、校验、跨模块规则、端到端流程
+python -m pytest              # 66 个用例：接口、校验、跨模块规则、端到端流程
 ```
 
-覆盖重点：绿地编号生成与唯一性、枚举与字段校验、列表过滤/排序/分页、任务状态自动流转与手动流转限制、记录删除后的状态回退、更换金额核算、删除保护与强制删除、统计聚合口径一致性、演示数据自洽性。
+覆盖重点：绿地编号生成与唯一性、枚举与字段校验、列表过滤/排序/分页、任务状态自动流转与手动流转限制、记录删除后的状态回退、更换金额核算、树木建档与经纬度校验、按保护级别/行政区检索树木、措施逐次登记与日期约束、删除保护与强制删除、统计聚合口径一致性、演示数据自洽性。
 
 ## 九、常见问题
 

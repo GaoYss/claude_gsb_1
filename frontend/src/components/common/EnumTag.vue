@@ -21,6 +21,9 @@ const TAG_TYPES = {
   quality_result: { qualified: 'success', pending: 'warning', unqualified: 'danger' },
   maintenance_grade: { level1: 'success', level2: 'primary', level3: 'info' },
   replacement_reason: { dead: 'danger', disease: 'warning', aging: 'info', upgrade: 'primary' },
+  tree_protection_level: { level1: 'danger', level2: 'warning', level3: 'primary', famous: 'success', ordinary: 'info' },
+  tree_growth_vigor: { vigorous: 'success', normal: 'primary', weak: 'warning', endangered: 'danger' },
+  tree_measure_type: { rejuvenation: 'success', support: 'warning', anticorrosion: 'primary', pest: 'danger' },
 }
 
 const meta = useMetaStore()

@@ -127,6 +127,36 @@
             </el-tag>
           </div>
         </el-tab-pane>
+
+        <el-tab-pane :label="`树木档案（${treeTotal}）`" name="trees">
+          <div class="tab-actions">
+            <el-button link type="primary" @click="goList('trees')">查看全部树木档案</el-button>
+          </div>
+          <el-table :data="trees" size="small" empty-text="暂无树木档案">
+            <el-table-column prop="code" label="档案编号" width="140">
+              <template #default="{ row }">
+                <el-link type="primary" :underline="false" @click="router.push(`/trees/${row.id}`)">{{ row.code }}</el-link>
+              </template>
+            </el-table-column>
+            <el-table-column prop="species" label="树种" width="120" />
+            <el-table-column label="胸径 / 树高 / 树龄" width="180">
+              <template #default="{ row }">
+                {{ formatNumber(row.dbh_cm) }} cm / {{ formatNumber(row.height_m) }} m / {{ row.age_years ?? '-' }} 年
+              </template>
+            </el-table-column>
+            <el-table-column label="保护级别" width="110">
+              <template #default="{ row }">
+                <EnumTag group="tree_protection_level" :value="row.protection_level" :label="row.protection_level_label" />
+              </template>
+            </el-table-column>
+            <el-table-column label="责任单位" min-width="150" show-overflow-tooltip>
+              <template #default="{ row }">{{ row.responsible_unit || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="养护措施" width="90" align="center">
+              <template #default="{ row }">{{ row.statistics?.maintenance_count ?? 0 }} 次</template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
       </el-tabs>
     </div>
 
@@ -138,7 +168,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { greenSpaceApi } from '@/api'
+import { greenSpaceApi, treeApi } from '@/api'
 import EnumTag from '@/components/common/EnumTag.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatCard from '@/components/common/StatCard.vue'
@@ -158,6 +188,8 @@ const recentTasks = ref([])
 const recentRecords = ref([])
 const recentReplacements = ref([])
 const replacementSummary = ref([])
+const trees = ref([])
+const treeTotal = ref(0)
 
 const taskTotal = computed(() =>
   Object.values(statistics.value.task_status || {}).reduce((sum, value) => sum + value, 0),
@@ -173,6 +205,9 @@ async function load() {
     recentRecords.value = data.recent_records || []
     recentReplacements.value = data.recent_replacements || []
     replacementSummary.value = data.replacement_summary || []
+    const treeData = await treeApi.list({ green_space_id: route.params.id, page_size: 50 })
+    trees.value = treeData?.items || []
+    treeTotal.value = treeData?.meta?.total ?? 0
   } finally {
     loading.value = false
   }
@@ -182,6 +217,7 @@ const LIST_ROUTES = {
   tasks: 'task-list',
   records: 'record-list',
   replacements: 'replacement-list',
+  trees: 'tree-list',
 }
 
 function goList(name) {

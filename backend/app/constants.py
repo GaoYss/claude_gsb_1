@@ -130,6 +130,34 @@ MEASURE_UNIT = EnumGroup("measure_unit", [
     ("clump", "丛"),
 ])
 
+# ---------------------------------------------------------------- 树木档案
+TREE_PROTECTION_LEVEL = EnumGroup("tree_protection_level", [
+    ("level1", "一级古树"),
+    ("level2", "二级古树"),
+    ("level3", "三级古树"),
+    ("famous", "名木"),
+    ("ordinary", "一般树木"),
+])
+
+TREE_GROWTH_VIGOR = EnumGroup("tree_growth_vigor", [
+    ("vigorous", "旺盛"),
+    ("normal", "正常"),
+    ("weak", "衰弱"),
+    ("endangered", "濒危"),
+])
+
+TREE_MEASURE_TYPE = EnumGroup("tree_measure_type", [
+    ("rejuvenation", "复壮"),
+    ("support", "支撑加固"),
+    ("anticorrosion", "防腐处理"),
+    ("prune", "修剪"),
+    ("pest", "病虫害防治"),
+    ("fertilize", "施肥"),
+    ("water", "浇灌排水"),
+    ("inspect", "巡查监测"),
+    ("other", "其他措施"),
+])
+
 # 前端下拉与文档共用的一份字典清单
 ENUM_GROUPS = {
     "green_space_type": GREEN_SPACE_TYPE,
@@ -144,6 +172,9 @@ ENUM_GROUPS = {
     "replacement_reason": REPLACEMENT_REASON,
     "old_plant_status": OLD_PLANT_STATUS,
     "measure_unit": MEASURE_UNIT,
+    "tree_protection_level": TREE_PROTECTION_LEVEL,
+    "tree_growth_vigor": TREE_GROWTH_VIGOR,
+    "tree_measure_type": TREE_MEASURE_TYPE,
 }
 
 

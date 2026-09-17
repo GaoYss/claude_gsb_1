@@ -17,6 +17,8 @@ from .services import (
     MaintenanceRecordService,
     MaintenanceTaskService,
     PlantReplacementService,
+    TreeMaintenanceService,
+    TreeService,
 )
 
 SPACE_SEEDS = [
@@ -164,6 +166,33 @@ WEATHERS = ["sunny", "cloudy", "overcast", "rain", "windy"]
 WORKERS = ["王海涛", "李建民", "张凤英", "吴国强", "何丽萍", "赵春生", "孙明华", "许娟"]
 SUPPLIERS = ["萧山苗木合作社", "临安绿源苗圃", "余杭花卉基地", "杭州城西园艺公司"]
 
+# 树种、拉丁学名、保护级别、树龄、胸径(cm)、树高(m)、生长势
+TREE_SEEDS = [
+    ("香樟", "Cinnamomum camphora", "level1", 520, 128.5, 18.0, "normal"),
+    ("银杏", "Ginkgo biloba", "level2", 320, 96.0, 21.5, "normal"),
+    ("枫香", "Liquidambar formosana", "level3", 160, 78.4, 22.0, "weak"),
+    ("罗汉松", "Podocarpus macrophyllus", "famous", 210, 45.2, 9.5, "normal"),
+    ("香樟", "Cinnamomum camphora", "ordinary", 60, 38.0, 12.5, "vigorous"),
+    ("无患子", "Sapindus mukorossi", "ordinary", 45, 32.6, 11.0, "vigorous"),
+]
+
+MEASURE_CONTENTS = {
+    "rejuvenation": ["开挖放射状复壮沟 4 条，回填腐殖土并施生物有机肥 80 公斤",
+                     "树冠投影区打孔透气 36 孔，灌施生根营养液"],
+    "support": ["对偏冠主干加装钢管支撑 2 处，抱箍内衬橡胶保护层",
+                "更换老化支撑 3 处，重新校准受力点"],
+    "anticorrosion": ["清理主干腐朽树洞，打磨后涂刷防腐剂并做防水封层",
+                      "刮除病斑树皮，涂抹石硫合剂消毒"],
+    "prune": ["疏剪内膛枯枝与交叉枝，清运枝条 1 车", "树冠轻量化修剪，降低风阻"],
+    "pest": ["树干注射法防治天牛，封堵虫孔 12 处", "喷施生物药剂防治蚜虫，悬挂诱虫板 20 张"],
+    "fertilize": ["环状沟施缓释复合肥 25 公斤", "叶面喷施微量元素肥 2 次"],
+    "water": ["连续干旱，早晚滴灌补水 6 吨", "树穴开沟排水，防止积水烂根"],
+    "inspect": ["年度健康巡查：测定制叶量与树干倾斜度，长势稳定", "台风前专项巡检，检查支撑与枯枝"],
+}
+
+RESPONSIBLE_UNITS = ["杭州市绿化管理站", "区园林绿化发展中心", "市城投养护公司"]
+LOCATION_DESCS = ["主入口东侧约 30 米", "中心草坪西北角", "沿河步道第 3 节点", "管理用房南侧", "古亭旁"]
+
 
 def register_cli(app):
     app.cli.add_command(init_db_command)
@@ -207,7 +236,8 @@ def seed_command(reset, seed_value):
     summary = generate_demo_data(random.Random(seed_value))
     click.echo(
         "演示数据写入完成：绿地 {green_space} 处、养护任务 {maintenance_task} 条、"
-        "养护记录 {maintenance_record} 条、绿植更换 {plant_replacement} 条".format(**summary)
+        "养护记录 {maintenance_record} 条、绿植更换 {plant_replacement} 条、"
+        "树木档案 {tree} 份、树木养护措施 {tree_maintenance} 次".format(**summary)
     )
 
 
@@ -220,6 +250,8 @@ def generate_demo_data(rng):
         "maintenance_task": 0,
         "maintenance_record": 0,
         "plant_replacement": 0,
+        "tree": 0,
+        "tree_maintenance": 0,
     }
 
     for index, space_seed in enumerate(SPACE_SEEDS):
@@ -307,6 +339,35 @@ def generate_demo_data(rng):
                 "quality_result": "qualified",
             })
             counts["maintenance_record"] += 1
+
+        # 树木档案：一树一档，复壮、支撑、防腐等措施逐次登记
+        for _ in range(rng.randint(1, 2)):
+            species, latin, level, age, dbh, height, vigor = rng.choice(TREE_SEEDS)
+            tree = TreeService.create({
+                "green_space_id": space.id,
+                "species": species,
+                "latin_name": latin,
+                "protection_level": level,
+                "age_years": age,
+                "dbh_cm": dbh,
+                "height_m": height,
+                "growth_vigor": vigor,
+                "responsible_unit": rng.choice(RESPONSIBLE_UNITS),
+                "longitude": round(120.10 + rng.random() * 0.12, 6),
+                "latitude": round(30.20 + rng.random() * 0.10, 6),
+                "location_desc": rng.choice(LOCATION_DESCS),
+            })
+            counts["tree"] += 1
+            for _ in range(rng.randint(1, 4)):
+                measure_type = rng.choice(list(MEASURE_CONTENTS))
+                TreeMaintenanceService.create({
+                    "tree_id": tree.id,
+                    "measure_type": measure_type,
+                    "measure_date": today_ - timedelta(days=rng.randint(10, 400)),
+                    "content": rng.choice(MEASURE_CONTENTS[measure_type]),
+                    "operator": rng.choice(WORKERS),
+                })
+                counts["tree_maintenance"] += 1
 
     # 一条已取消任务，覆盖全部状态场景
     first_space = db.session.query(GreenSpace).order_by(GreenSpace.id.asc()).first()

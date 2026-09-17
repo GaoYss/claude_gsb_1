@@ -28,3 +28,9 @@ def quantity_column():
     """数量列（面积、株数、工时等）。"""
 
     return db.Numeric(12, 2, asdecimal=False)
+
+
+def coordinate_column():
+    """经纬度列：保留 6 位小数，满足点位精度。"""
+
+    return db.Numeric(10, 6, asdecimal=False)

@@ -151,6 +151,51 @@ def make_replacement(make_space):
 
 
 @pytest.fixture()
+def make_tree(make_space):
+    from app.services import TreeService
+
+    def _make(space=None, **overrides):
+        space = space or make_space()
+        payload = {
+            "green_space_id": space.id,
+            "species": "香樟",
+            "latin_name": "Cinnamomum camphora",
+            "dbh_cm": 86.5,
+            "height_m": 16.0,
+            "age_years": 210,
+            "protection_level": "level2",
+            "growth_vigor": "normal",
+            "responsible_unit": "杭州市绿化管理站",
+            "longitude": 120.1551,
+            "latitude": 30.2742,
+            "location_desc": "主入口东侧约 30 米",
+        }
+        payload.update(overrides)
+        return TreeService.create(payload)
+
+    return _make
+
+
+@pytest.fixture()
+def make_tree_maintenance(make_tree):
+    from app.services import TreeMaintenanceService
+
+    def _make(tree=None, **overrides):
+        tree = tree or make_tree()
+        payload = {
+            "tree_id": tree.id,
+            "measure_type": "rejuvenation",
+            "measure_date": date(2026, 4, 10),
+            "content": "开挖放射状复壮沟 4 条，回填腐殖土",
+            "operator": "王海涛",
+        }
+        payload.update(overrides)
+        return TreeMaintenanceService.create(payload)
+
+    return _make
+
+
+@pytest.fixture()
 def seeded(app):
     """写入演示数据（固定随机种子，保证断言稳定）。"""
 
