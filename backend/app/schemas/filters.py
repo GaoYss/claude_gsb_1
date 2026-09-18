@@ -110,3 +110,21 @@ def replacement_filters(args):
     filters["date_from"] = _date(args, "date_from")
     filters["date_to"] = _date(args, "date_to")
     return filters
+
+
+def tree_filters(args):
+    filters = {}
+    green_space_id = _int(args, "green_space_id")
+    if green_space_id:
+        filters["green_space_id"] = green_space_id
+    for key, group_key in (("protection_level", "tree_protection_level"), ("vigor", "tree_vigor")):
+        value = _enum(args, key, group_key)
+        if value:
+            filters[key] = value
+    district = _text(args, "district")
+    if district:
+        filters["district"] = district
+    keyword = _text(args, "keyword")
+    if keyword:
+        filters["keyword"] = keyword
+    return filters

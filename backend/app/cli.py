@@ -17,6 +17,8 @@ from .services import (
     MaintenanceRecordService,
     MaintenanceTaskService,
     PlantReplacementService,
+    TreeMaintenanceService,
+    TreeService,
 )
 
 SPACE_SEEDS = [
@@ -164,6 +166,62 @@ WEATHERS = ["sunny", "cloudy", "overcast", "rain", "windy"]
 WORKERS = ["王海涛", "李建民", "张凤英", "吴国强", "何丽萍", "赵春生", "孙明华", "许娟"]
 SUPPLIERS = ["萧山苗木合作社", "临安绿源苗圃", "余杭花卉基地", "杭州城西园艺公司"]
 
+# 一树一档的演示模板：按绿地名称定位，覆盖古树名木与一般乔木
+TREE_TEMPLATES = {
+    "武林广场中轴绿地": [
+        {"species": "香樟", "scientific": "Cinnamomum camphora", "dbh": 78, "height": 16,
+         "crown": 11, "age": 320, "level": "famous", "vigor": "vigorous",
+         "unit": "杭州市园林文物局", "person": "沈建国", "location": "广场中轴北端喷泉西侧",
+         "lng": 120.16921, "lat": 30.27405, "planted": date(1706, 1, 1)},
+    ],
+    "运河文化公园": [
+        {"species": "垂柳", "scientific": "Salix babylonica", "dbh": 56, "height": 14,
+         "crown": 8, "age": 210, "level": "level1", "vigor": "weak",
+         "unit": "拱墅区城市管理局", "person": "俞晓慧", "location": "运河东岸亲水平台 3 号桩",
+         "lng": 120.14872, "lat": 30.31954, "planted": date(1816, 1, 1)},
+        {"species": "黄山栾树", "scientific": "Koelreuteria bipinnata", "dbh": 42, "height": 13,
+         "crown": 7, "age": 96, "level": "level3", "vigor": "vigorous",
+         "unit": "拱墅区城市管理局", "person": "俞晓慧", "location": "公园南门主步道东侧第 2 株",
+         "lng": 120.14903, "lat": 30.31788, "planted": date(1930, 1, 1)},
+    ],
+    "文一西路沿线绿地": [
+        {"species": "银杏", "scientific": "Ginkgo biloba", "dbh": 64, "height": 18,
+         "crown": 9, "age": 410, "level": "level1", "vigor": "vigorous",
+         "unit": "余杭区园林绿化发展中心", "person": "陈立群", "location": "文一西路与荆长大道交叉口西北侧",
+         "lng": 120.07625, "lat": 30.28854, "planted": date(1616, 1, 1)},
+    ],
+    "西溪里小区附属绿地": [
+        {"species": "桂花", "scientific": "Osmanthus fragrans", "dbh": 38, "height": 9,
+         "crown": 6, "age": 180, "level": "level2", "vigor": "vigorous",
+         "unit": "西湖区西溪街道办事处", "person": "周雯", "location": "小区中心花园亭南侧",
+         "lng": 120.10327, "lat": 30.27762, "planted": date(1846, 1, 1)},
+    ],
+    "滨江公园樱花大道": [
+        {"species": "染井吉野樱", "scientific": "Cerasus yedoensis", "dbh": 24, "height": 8,
+         "crown": 5, "age": 22, "level": "none", "vigor": "vigorous",
+         "unit": "滨江区住建局", "person": "林轶", "location": "樱花大道 K0+320 处北侧",
+         "lng": 120.20764, "lat": 30.20882, "planted": date(2004, 3, 20)},
+    ],
+    "之江路立体绿化试点": [],
+    "临丁路老苗圃绿地": [
+        {"species": "香樟", "scientific": "Cinnamomum camphora", "dbh": 88, "height": 17,
+         "crown": 12, "age": 520, "level": "famous", "vigor": "endangered",
+         "unit": "余杭区园林绿化发展中心", "person": "戴伟民", "location": "原苗圃办公旧址院门内（已围挡保护）",
+         "lng": 120.13561, "lat": 30.35672, "planted": date(1506, 1, 1)},
+    ],
+}
+
+# 不同保护级别树木的典型养护措施
+TREE_CARE_TEMPLATES = [
+    ("rejuvenate", "树冠打孔注灌复壮基质，疏松根际土壤并追施有机肥", "萌出新梢，树势有所恢复"),
+    ("support", "安装钢管三脚支撑并加装护树圈，螺栓加软垫防止磨损树皮", "支撑牢固，树体倾斜得到矫正"),
+    ("antisepsis", "清理腐烂木质部，涂布杀菌剂与防腐剂后做防腐封闭", "腐朽部位已封闭，待复查"),
+    ("fill", "树洞清创消毒后填充发泡材料并做树皮纹理封口", "填补密实，无渗水"),
+    ("pest", "喷施低毒药剂防治白蚁与天牛，悬挂诱捕器监测虫情", "未发现新增蛀孔"),
+    ("protect", "修建树池围栏与防雷接地装置，增设古树保护说明牌", "防护设施完好"),
+    ("fertilize", "沿树冠投影环状沟施缓释复合肥并浇透水", "叶色转绿"),
+]
+
 
 def register_cli(app):
     app.cli.add_command(init_db_command)
@@ -207,7 +265,8 @@ def seed_command(reset, seed_value):
     summary = generate_demo_data(random.Random(seed_value))
     click.echo(
         "演示数据写入完成：绿地 {green_space} 处、养护任务 {maintenance_task} 条、"
-        "养护记录 {maintenance_record} 条、绿植更换 {plant_replacement} 条".format(**summary)
+        "养护记录 {maintenance_record} 条、绿植更换 {plant_replacement} 条、"
+        "树木档案 {tree_profile} 株、养护措施 {tree_maintenance} 条".format(**summary)
     )
 
 
@@ -220,6 +279,8 @@ def generate_demo_data(rng):
         "maintenance_task": 0,
         "maintenance_record": 0,
         "plant_replacement": 0,
+        "tree_profile": 0,
+        "tree_maintenance": 0,
     }
 
     for index, space_seed in enumerate(SPACE_SEEDS):
@@ -322,6 +383,48 @@ def generate_demo_data(rng):
             "status": "cancelled",
         })
         counts["maintenance_task"] += 1
+
+    # 一树一档：古树名木与重点乔木逐株建档，并回填历史养护措施
+    care_count_by_level = {"famous": (3, 5), "level1": (3, 5), "level2": (2, 3),
+                           "level3": (1, 3), "none": (0, 1)}
+    for space in db.session.query(GreenSpace).order_by(GreenSpace.id.asc()).all():
+        for template in TREE_TEMPLATES.get(space.name, []):
+            tree = TreeService.create({
+                "green_space_id": space.id,
+                "tree_species": template["species"],
+                "scientific_name": template["scientific"],
+                "dbh_cm": template["dbh"],
+                "height_m": template["height"],
+                "crown_width_m": template["crown"],
+                "age_years": template["age"],
+                "protection_level": template["level"],
+                "vigor": template["vigor"],
+                "responsible_unit": template["unit"],
+                "responsible_person": template["person"],
+                "contact_phone": space.contact_phone,
+                "location_desc": template["location"],
+                "longitude": template["lng"],
+                "latitude": template["lat"],
+                "planted_date": template["planted"],
+                "register_date": today_ - timedelta(days=rng.randint(120, 900)),
+                "remark": "古树名木，重点监测" if template["level"] in {"famous", "level1"} else None,
+            })
+            counts["tree_profile"] += 1
+
+            low, high = care_count_by_level[template["level"]]
+            care_total = rng.randint(low, high)
+            chosen = rng.sample(TREE_CARE_TEMPLATES, k=min(care_total, len(TREE_CARE_TEMPLATES)))
+            for index, (care_type, content, result) in enumerate(chosen):
+                TreeMaintenanceService.create({
+                    "tree_id": tree.id,
+                    "care_type": care_type,
+                    "care_date": today_ - timedelta(days=rng.randint(30, 900 - index * 60)),
+                    "content": content,
+                    "operator": rng.choice(WORKERS),
+                    "result": result,
+                    "cost": round(rng.uniform(300, 8000), 2),
+                })
+                counts["tree_maintenance"] += 1
 
     db.session.commit()
     return counts

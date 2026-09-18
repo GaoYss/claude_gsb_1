@@ -44,6 +44,18 @@ const routes = [
         component: () => import('@/views/replacement/ReplacementListView.vue'),
         meta: { title: '绿植更换', icon: 'Cherry' },
       },
+      {
+        path: 'trees',
+        name: 'tree-list',
+        component: () => import('@/views/tree/TreeListView.vue'),
+        meta: { title: '树木档案', icon: 'Place' },
+      },
+      {
+        path: 'trees/:id',
+        name: 'tree-detail',
+        component: () => import('@/views/tree/TreeDetailView.vue'),
+        meta: { title: '树木档案详情', activeMenu: '/trees' },
+      },
     ],
   },
   {

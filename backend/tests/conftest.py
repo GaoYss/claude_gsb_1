@@ -151,6 +151,57 @@ def make_replacement(make_space):
 
 
 @pytest.fixture()
+def make_tree(make_space):
+    from app.services import TreeService
+
+    counter = {"n": 0}
+
+    def _make(space=None, **overrides):
+        space = space or make_space()
+        counter["n"] += 1
+        payload = {
+            "green_space_id": space.id,
+            "tree_species": f"香樟{counter['n']}",
+            "scientific_name": "Cinnamomum camphora",
+            "dbh_cm": 45,
+            "height_m": 12,
+            "crown_width_m": 7,
+            "age_years": 80,
+            "protection_level": "level2",
+            "vigor": "vigorous",
+            "responsible_unit": "杭州市园林文物局",
+            "responsible_person": "王海涛",
+            "location_desc": "主步道东侧第 1 株",
+            "register_date": date(2026, 1, 10),
+        }
+        payload.update(overrides)
+        return TreeService.create(payload)
+
+    return _make
+
+
+@pytest.fixture()
+def make_tree_care(make_tree):
+    from app.services import TreeMaintenanceService
+
+    def _make(tree=None, **overrides):
+        tree = tree or make_tree()
+        payload = {
+            "tree_id": tree.id,
+            "care_type": "support",
+            "care_date": date(2026, 3, 20),
+            "content": "安装钢管三脚支撑并加装护树圈",
+            "operator": "李建民",
+            "result": "支撑牢固，树体倾斜得到矫正",
+            "cost": 1200,
+        }
+        payload.update(overrides)
+        return TreeMaintenanceService.create(payload)
+
+    return _make
+
+
+@pytest.fixture()
 def seeded(app):
     """写入演示数据（固定随机种子，保证断言稳定）。"""
 

@@ -38,6 +38,9 @@
       <StatCard label="绿植更换" :value="formatNumber(statistics.replacement_quantity)"
                 :hint="`共 ${formatNumber(statistics.replacement_count)} 次，金额 ${formatCurrency(statistics.replacement_amount)}`"
                 icon="Cherry" />
+      <StatCard label="树木档案" :value="formatNumber(statistics.tree_count)" unit="株"
+                :hint="`其中古树名木 / 保护树木 ${formatNumber(statistics.protected_tree_count)} 株`"
+                tone="info" icon="Place" />
       <StatCard label="养护任务" :value="formatNumber(taskTotal)" unit="项"
                 :hint="`已完成 ${statistics.task_status.completed || 0} 项，进行中 ${(statistics.task_status.in_progress || 0) + (statistics.task_status.pending || 0)} 项`"
                 tone="info" icon="Tickets" />
@@ -127,6 +130,46 @@
             </el-tag>
           </div>
         </el-tab-pane>
+
+        <el-tab-pane label="树木档案" name="trees">
+          <div class="tab-actions">
+            <el-button link type="primary" @click="goList('trees')">查看全部树木档案</el-button>
+          </div>
+          <el-table :data="recentTrees" size="small" empty-text="该绿地暂无树木建档">
+            <el-table-column prop="tree_no" label="档案编号" width="140" />
+            <el-table-column label="树种" min-width="150">
+              <template #default="{ row }">
+                <div>{{ row.tree_species }}</div>
+                <div class="cell-sub">{{ row.scientific_name || '—' }}</div>
+              </template>
+            </el-table-column>
+            <el-table-column label="胸径 / 树高 / 树龄" width="180">
+              <template #default="{ row }">
+                <div class="cell-sub">
+                  {{ formatNumber(row.dbh_cm) }} cm / {{ formatNumber(row.height_m) }} m /
+                  {{ formatNumber(row.age_years) }} 年
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="保护级别" width="105">
+              <template #default="{ row }">
+                <EnumTag group="tree_protection_level" :value="row.protection_level"
+                         :label="row.protection_level_label" />
+              </template>
+            </el-table-column>
+            <el-table-column label="生长势" width="100">
+              <template #default="{ row }">
+                <EnumTag group="tree_vigor" :value="row.vigor" :label="row.vigor_label" />
+              </template>
+            </el-table-column>
+            <el-table-column prop="responsible_unit" label="责任单位" min-width="150" show-overflow-tooltip />
+            <el-table-column label="操作" width="80" fixed="right">
+              <template #default="{ row }">
+                <el-button link type="primary" @click="goTree(row)">档案</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
       </el-tabs>
     </div>
 
@@ -157,6 +200,7 @@ const statistics = ref({ task_status: {}, record_count: 0, total_work_hours: 0, 
 const recentTasks = ref([])
 const recentRecords = ref([])
 const recentReplacements = ref([])
+const recentTrees = ref([])
 const replacementSummary = ref([])
 
 const taskTotal = computed(() =>
@@ -172,6 +216,7 @@ async function load() {
     recentTasks.value = data.recent_tasks || []
     recentRecords.value = data.recent_records || []
     recentReplacements.value = data.recent_replacements || []
+    recentTrees.value = data.recent_trees || []
     replacementSummary.value = data.replacement_summary || []
   } finally {
     loading.value = false
@@ -182,10 +227,15 @@ const LIST_ROUTES = {
   tasks: 'task-list',
   records: 'record-list',
   replacements: 'replacement-list',
+  trees: 'tree-list',
 }
 
 function goList(name) {
   router.push({ name: LIST_ROUTES[name], query: { green_space_id: route.params.id } })
+}
+
+function goTree(row) {
+  router.push({ name: 'tree-detail', params: { id: row.id } })
 }
 
 onMounted(load)
@@ -208,5 +258,10 @@ onMounted(load)
 
 .summary-tag {
   margin-right: 4px;
+}
+
+.cell-sub {
+  color: #909399;
+  font-size: 12px;
 }
 </style>

@@ -5,7 +5,7 @@ from sqlalchemy import and_, func, or_
 from ..constants import ENUM_GROUPS, GREEN_SPACE_STATUS
 from ..errors import ConflictError
 from ..extensions import db
-from ..models import GreenSpace, MaintenanceRecord, MaintenanceTask, PlantReplacement
+from ..models import GreenSpace, MaintenanceRecord, MaintenanceTask, PlantReplacement, TreeProfile
 from ..models.maintenance_task import OPEN_STATUSES
 from ..utils.dates import format_date, today
 from ..utils.numbers import to_float
@@ -92,6 +92,23 @@ class GreenSpaceService(BaseService):
             .correlate(GreenSpace)
             .scalar_subquery()
         )
+        tree_count = (
+            db.select(func.count(TreeProfile.id))
+            .where(TreeProfile.green_space_id == GreenSpace.id)
+            .correlate(GreenSpace)
+            .scalar_subquery()
+        )
+        protected_tree_count = (
+            db.select(func.count(TreeProfile.id))
+            .where(
+                and_(
+                    TreeProfile.green_space_id == GreenSpace.id,
+                    TreeProfile.protection_level != "none",
+                )
+            )
+            .correlate(GreenSpace)
+            .scalar_subquery()
+        )
         last_maintenance = (
             db.select(func.max(MaintenanceRecord.record_date))
             .where(MaintenanceRecord.green_space_id == GreenSpace.id)
@@ -105,6 +122,8 @@ class GreenSpaceService(BaseService):
             open_task_count.label("open_task_count"),
             record_count.label("record_count"),
             replacement_count.label("replacement_count"),
+            tree_count.label("tree_count"),
+            protected_tree_count.label("protected_tree_count"),
             last_maintenance.label("last_maintenance_date"),
         )
         query = cls._apply_filters(query, filters)
@@ -113,13 +132,16 @@ class GreenSpaceService(BaseService):
 
     @classmethod
     def serialize_row(cls, row):
-        space, task_count, open_task_count, record_count, replacement_count, last_date = row
+        (space, task_count, open_task_count, record_count, replacement_count,
+         tree_count, protected_tree_count, last_date) = row
         data = space.to_dict()
         data["statistics"] = {
             "task_count": task_count or 0,
             "open_task_count": open_task_count or 0,
             "record_count": record_count or 0,
             "replacement_count": replacement_count or 0,
+            "tree_count": tree_count or 0,
+            "protected_tree_count": protected_tree_count or 0,
             "last_maintenance_date": format_date(last_date),
         }
         return data
@@ -177,6 +199,24 @@ class GreenSpaceService(BaseService):
             func.coalesce(func.sum(PlantReplacement.amount), 0),
         ).filter(PlantReplacement.green_space_id == space.id).one()
 
+        tree_count = (
+            db.session.query(func.count(TreeProfile.id))
+            .filter(TreeProfile.green_space_id == space.id)
+            .scalar()
+            or 0
+        )
+        protected_tree_count = (
+            db.session.query(func.count(TreeProfile.id))
+            .filter(
+                and_(
+                    TreeProfile.green_space_id == space.id,
+                    TreeProfile.protection_level != "none",
+                )
+            )
+            .scalar()
+            or 0
+        )
+
         task_rows = (
             db.session.query(MaintenanceTask.status, func.count(MaintenanceTask.id))
             .filter(MaintenanceTask.green_space_id == space.id)
@@ -215,6 +255,13 @@ class GreenSpaceService(BaseService):
             .limit(5)
             .all()
         )
+        recent_trees = (
+            db.session.query(TreeProfile)
+            .filter(TreeProfile.green_space_id == space.id)
+            .order_by(TreeProfile.register_date.desc(), TreeProfile.id.desc())
+            .limit(5)
+            .all()
+        )
 
         return {
             "green_space": space.to_dict(detail=True),
@@ -225,6 +272,8 @@ class GreenSpaceService(BaseService):
                 "replacement_count": replacement_stats[0] or 0,
                 "replacement_quantity": to_float(replacement_stats[1]) or 0,
                 "replacement_amount": to_float(replacement_stats[2]) or 0,
+                "tree_count": tree_count,
+                "protected_tree_count": protected_tree_count,
                 "task_status": task_status,
                 "is_maintenance_overdue": (
                     record_stats[2] is None or (today() - record_stats[2]).days > 30
@@ -243,6 +292,7 @@ class GreenSpaceService(BaseService):
             "recent_tasks": [item.to_dict() for item in recent_tasks],
             "recent_records": [item.to_dict() for item in recent_records],
             "recent_replacements": [item.to_dict() for item in recent_replacements],
+            "recent_trees": [item.to_dict() for item in recent_trees],
         }
 
     # ------------------------------------------------------------ 写入
@@ -262,11 +312,16 @@ class GreenSpaceService(BaseService):
             .filter(PlantReplacement.green_space_id == space.id)
             .scalar()
             or 0,
+            "tree_profile": db.session.query(func.count(TreeProfile.id))
+            .filter(TreeProfile.green_space_id == space.id)
+            .scalar()
+            or 0,
         }
         if sum(counts.values()) and not force:
             raise ConflictError(
                 "该绿地已存在养护任务 {maintenance_task} 条、养护记录 {maintenance_record} 条、"
-                "绿植更换记录 {plant_replacement} 条，删除将一并清除，请确认后重试".format(**counts),
+                "绿植更换记录 {plant_replacement} 条、树木档案 {tree_profile} 株，"
+                "删除将一并清除，请确认后重试".format(**counts),
                 details=counts,
             )
         db.session.delete(space)
